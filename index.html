@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Rising Stars — Team &amp; Fund Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<!-- Firebase (Firestore) — used as the shared, permanent, cross-device database -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --bg0:#05070f;
+  --bg1:#0a0f22;
+  --bg2:#0e1730;
+  --glass: rgba(255,255,255,.045);
+  --glass-hi: rgba(255,255,255,.08);
+  --brd: rgba(255,255,255,.09);
+  --brd-hi: rgba(255,255,255,.18);
+  --text:#eef3ff;
+  --text-dim:#93a1c4;
+  --text-faint:#5c6890;
+  --emerald:#17e6a1;
+  --emerald-dim:#0da978;
+  --violet:#8b6bf7;
+  --violet-dim:#6a4fd8;
+  --amber:#ffb454;
+  --rose:#ff5c7a;
+  --danger:#ff5c7a;
+  --danger-bg:rgba(255,92,122,.12);
+  --success:#17e6a1;
+  --success-bg:rgba(23,230,161,.12);
+  --pending:#ffb454;
+  --pending-bg:rgba(255,180,84,.12);
+  --neutral-bg:rgba(255,255,255,.06);
+  --radius:20px;
+  --shadow: 0 30px 70px -24px rgba(0,0,0,.65);
+  --glow-em: 0 0 0 1px rgba(23,230,161,.35), 0 20px 45px -18px rgba(23,230,161,.35);
+  --font-display:'Sora', sans-serif;
+  --font-body:'Inter', sans-serif;
+  --font-mono:'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  font-family:var(--font-body);
+  color:var(--text);
+  min-height:100vh;
+  background:linear-gradient(165deg, var(--bg0), var(--bg1) 55%, var(--bg2));
+  overflow-x:hidden;
+  position:relative;
+}
+.blob{position:fixed; border-radius:50%; filter:blur(90px); z-index:0; pointer-events:none; mix-blend-mode:screen;}
+.blob1{width:520px; height:520px; top:-160px; left:-120px; background:radial-gradient(circle, rgba(23,230,161,.35), transparent 70%); animation:drift1 22s ease-in-out infinite;}
+.blob2{width:600px; height:600px; top:20%; right:-220px; background:radial-gradient(circle, rgba(139,107,247,.32), transparent 70%); animation:drift2 26s ease-in-out infinite;}
+.blob3{width:460px; height:460px; bottom:-180px; left:20%; background:radial-gradient(circle, rgba(255,180,84,.22), transparent 70%); animation:drift3 30s ease-in-out infinite;}
+@keyframes drift1{0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(60px,80px) scale(1.15);}}
+@keyframes drift2{0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(-70px,60px) scale(1.1);}}
+@keyframes drift3{0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(40px,-50px) scale(1.2);}}
+#app{position:relative; z-index:1; min-height:100vh;}
+::selection{background:var(--emerald); color:var(--bg0);}
+::-webkit-scrollbar{width:10px; height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--brd-hi); border-radius:10px;}
+a{color:inherit;}
+button{font-family:inherit; cursor:pointer;}
+input,select,textarea{font-family:inherit;}
+:focus-visible{outline:2px solid var(--emerald); outline-offset:2px;}
+
+/* ============ UTILITY ============ */
+.eyebrow{
+  font-family:var(--font-mono); letter-spacing:.2em; text-transform:uppercase;
+  font-size:.68rem; color:var(--emerald); display:flex; align-items:center; gap:10px; font-weight:500;
+}
+.eyebrow::before{content:''; width:22px; height:2px; background:linear-gradient(90deg,var(--emerald),var(--violet)); display:inline-block; border-radius:2px;}
+.divider{height:1px; width:100%; background:linear-gradient(90deg, transparent, var(--brd-hi), transparent); margin:18px 0;}
+.fadeUp{animation:fadeUp .65s cubic-bezier(.2,.8,.2,1) both;}
+@keyframes fadeUp{from{opacity:0; transform:translateY(24px);} to{opacity:1; transform:translateY(0);}}
+.pop{animation:pop .45s cubic-bezier(.34,1.56,.64,1) both;}
+@keyframes pop{from{opacity:0; transform:scale(.85);} to{opacity:1; transform:scale(1);}}
+.stagger > *{animation-fill-mode:both;}
+.stagger > *:nth-child(1){animation-delay:.02s;}
+.stagger > *:nth-child(2){animation-delay:.07s;}
+.stagger > *:nth-child(3){animation-delay:.12s;}
+.stagger > *:nth-child(4){animation-delay:.17s;}
+.stagger > *:nth-child(5){animation-delay:.22s;}
+.stagger > *:nth-child(6){animation-delay:.27s;}
+.stagger > *:nth-child(7){animation-delay:.32s;}
+.stagger > *:nth-child(8){animation-delay:.37s;}
+
+/* ============ BUTTONS ============ */
+.btn{
+  border:none; border-radius:999px; padding:13px 26px; font-weight:700; font-size:.92rem;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  transition:transform .18s ease, box-shadow .18s ease, filter .18s ease;
+  white-space:nowrap;
+}
+.btn:active{transform:scale(.96);}
+.btn-primary{background:linear-gradient(120deg, var(--emerald), var(--violet)); color:#04140f; box-shadow:0 14px 30px -10px rgba(23,230,161,.45);}
+.btn-primary:hover{filter:brightness(1.1); transform:translateY(-2px); box-shadow:0 18px 38px -10px rgba(139,107,247,.5);}
+.btn-ghost{background:var(--glass); color:var(--text); border:1px solid var(--brd);}
+.btn-ghost:hover{background:var(--glass-hi); transform:translateY(-2px); border-color:var(--brd-hi);}
+.btn-danger{background:var(--danger-bg); color:#ffb0c0; border:1px solid rgba(255,92,122,.4);}
+.btn-danger:hover{background:rgba(255,92,122,.25);}
+.btn-sm{padding:8px 16px; font-size:.78rem; border-radius:999px;}
+.btn-icon{width:40px; height:40px; padding:0; border-radius:50%; flex-shrink:0;}
+.btn-block{width:100%;}
+.btn[disabled]{opacity:.5; cursor:not-allowed; transform:none !important;}
+.link-btn{background:none; border:none; color:var(--emerald); font-weight:700; text-decoration:underline; text-underline-offset:3px;}
+
+/* ============ ROLE SELECT ============ */
+.hero-wrap{min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; text-align:center;}
+.brand{display:flex; flex-direction:column; align-items:center; gap:6px; margin-bottom:48px;}
+.ball{
+  width:66px; height:66px; border-radius:50%;
+  background:conic-gradient(from 200deg, var(--emerald), var(--violet), var(--amber), var(--emerald));
+  position:relative; box-shadow:0 20px 45px -12px rgba(23,230,161,.5), 0 0 0 1px rgba(255,255,255,.08);
+  animation:bounce 2.8s ease-in-out infinite;
+}
+.ball::before{content:''; position:absolute; inset:5px; border-radius:50%; background:var(--bg1);}
+.ball::after{content:'\f1e3'; font-family:'Font Awesome 6 Free'; font-weight:900; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1.3rem; color:var(--emerald);}
+@keyframes bounce{0%,100%{transform:translateY(0) rotate(0deg);} 50%{transform:translateY(-18px) rotate(180deg);}}
+.brand h1{font-family:var(--font-display); font-weight:800; font-size:2.7rem; letter-spacing:-.01em; margin-top:14px; background:linear-gradient(120deg, #fff, var(--emerald) 60%, var(--violet)); -webkit-background-clip:text; background-clip:text; color:transparent;}
+.brand span{font-family:var(--font-mono); font-size:.72rem; letter-spacing:.32em; color:var(--text-dim); text-transform:uppercase;}
+.role-grid{display:grid; grid-template-columns:1fr 1fr; gap:26px; max-width:740px; width:100%;}
+.role-card{
+  background:var(--glass); border:1px solid var(--brd); border-radius:24px; padding:38px 28px;
+  cursor:pointer; transition:transform .3s cubic-bezier(.2,.8,.2,1), border-color .3s, box-shadow .3s;
+  position:relative; overflow:hidden; text-align:left; backdrop-filter:blur(16px);
+}
+.role-card::after{
+  content:''; position:absolute; inset:0; opacity:0; transition:opacity .35s ease;
+  background:radial-gradient(320px 220px at 85% -10%, rgba(23,230,161,.25), transparent 70%);
+}
+.role-card:hover{transform:translateY(-10px); border-color:var(--emerald); box-shadow:var(--glow-em);}
+.role-card:hover::after{opacity:1;}
+.role-card .ic{width:52px; height:52px; border-radius:16px; background:linear-gradient(135deg, rgba(23,230,161,.2), rgba(139,107,247,.2)); display:flex; align-items:center; justify-content:center; margin-bottom:20px;}
+.role-card .ic i{font-size:1.4rem; color:var(--emerald);}
+.role-card h3{font-family:var(--font-display); font-weight:700; font-size:1.6rem; letter-spacing:-.01em; margin-bottom:8px;}
+.role-card p{font-size:.87rem; color:var(--text-dim); line-height:1.55;}
+@media (max-width:640px){.role-grid{grid-template-columns:1fr;}}
+
+/* ============ AUTH CARDS ============ */
+.auth-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 18px;}
+.auth-card{
+  width:100%; max-width:440px; background:rgba(10,15,34,.6); backdrop-filter:blur(18px);
+  border:1px solid var(--brd); border-radius:26px; padding:40px 34px; box-shadow:var(--shadow);
+}
+.auth-card .back-btn{background:none; border:none; color:var(--text-dim); font-size:.85rem; display:flex; align-items:center; gap:6px; margin-bottom:20px; transition:color .2s;}
+.auth-card .back-btn:hover{color:var(--emerald);}
+.auth-title{font-family:var(--font-display); font-weight:800; font-size:2.1rem; letter-spacing:-.01em; margin-bottom:4px;}
+.auth-sub{color:var(--text-dim); font-size:.85rem; margin-bottom:26px; line-height:1.5;}
+.field{margin-bottom:16px;}
+.field label{display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.1em; color:var(--emerald); margin-bottom:7px; font-weight:700;}
+.field input, .field select, .field textarea{
+  width:100%; background:rgba(255,255,255,.04); border:1px solid var(--brd);
+  color:var(--text); padding:12px 14px; border-radius:13px; font-size:.94rem; transition:border-color .2s, background .2s;
+}
+.field input::placeholder, .field textarea::placeholder{color:var(--text-faint);}
+.field input:focus, .field select:focus, .field textarea:focus{border-color:var(--emerald); background:rgba(23,230,161,.06);}
+.field select option{background:var(--bg1);}
+.row2{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+.seg{display:flex; gap:8px; background:rgba(255,255,255,.035); padding:5px; border-radius:13px; margin-bottom:22px;}
+.seg button{flex:1; padding:10px; border:none; background:transparent; color:var(--text-dim); border-radius:9px; font-weight:700; font-size:.85rem; transition:all .2s;}
+.seg button.active{background:linear-gradient(120deg, var(--emerald), var(--violet)); color:#04140f;}
+.pill-select{display:flex; gap:8px; flex-wrap:wrap;}
+.pill-select label{flex:1; min-width:96px;}
+.pill-select input{display:none;}
+.pill-select .pill{
+  display:block; text-align:center; padding:10px 8px; border-radius:11px; border:1px solid var(--brd);
+  background:rgba(255,255,255,.03); font-size:.82rem; font-weight:600; transition:all .2s; cursor:pointer;
+}
+.pill-select input:checked + .pill{background:linear-gradient(120deg, var(--emerald), var(--violet)); color:#04140f; border-color:transparent;}
+.hint{font-size:.78rem; color:var(--text-dim); margin-top:16px; text-align:center;}
+.err-box{background:var(--danger-bg); border:1px solid rgba(255,92,122,.4); color:#ffb0c0; padding:10px 14px; border-radius:12px; font-size:.82rem; margin-bottom:16px; display:none;}
+.err-box.show{display:block;}
+.admin-badge{display:inline-flex; align-items:center; gap:6px; background:rgba(139,107,247,.15); border:1px solid rgba(139,107,247,.4); color:#c3b3ff; padding:6px 12px; border-radius:999px; font-size:.72rem; font-weight:700; margin-bottom:18px;}
+
+/* ============ DASHBOARD SHELL ============ */
+.shell{display:flex; min-height:100vh;}
+.sidebar{
+  width:250px; flex-shrink:0; background:rgba(6,10,22,.65); backdrop-filter:blur(14px);
+  border-right:1px solid var(--brd); padding:26px 18px; display:flex; flex-direction:column; gap:6px;
+  position:sticky; top:0; height:100vh;
+}
+.sb-brand{display:flex; align-items:center; gap:10px; padding:6px 10px 22px;}
+.sb-ball{width:32px; height:32px; border-radius:50%; background:conic-gradient(from 200deg, var(--emerald), var(--violet), var(--amber), var(--emerald)); flex-shrink:0; position:relative;}
+.sb-ball::before{content:''; position:absolute; inset:3px; border-radius:50%; background:var(--bg1);}
+.sb-brand strong{font-family:var(--font-display); font-weight:700; font-size:1.1rem; letter-spacing:-.01em;}
+.sb-brand small{display:block; font-size:.62rem; color:var(--emerald); letter-spacing:.14em; text-transform:uppercase;}
+.nav-item{
+  display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:13px; border:none; background:transparent;
+  color:var(--text-dim); font-weight:600; font-size:.88rem; text-align:left; width:100%; transition:all .2s; position:relative;
+}
+.nav-item i{width:18px; text-align:center;}
+.nav-item:hover{background:var(--glass); color:var(--text);}
+.nav-item.active{background:linear-gradient(120deg, rgba(23,230,161,.18), rgba(139,107,247,.1)); color:var(--emerald);}
+.nav-item.active::before{content:''; position:absolute; left:-18px; top:50%; transform:translateY(-50%); width:4px; height:22px; background:linear-gradient(var(--emerald),var(--violet)); border-radius:0 4px 4px 0;}
+.nav-badge{margin-left:auto; background:var(--rose); color:#fff; font-size:.68rem; padding:2px 7px; border-radius:999px; font-weight:700;}
+.sb-foot{margin-top:auto; padding-top:14px; border-top:1px solid var(--brd);}
+.main{flex:1; padding:34px 40px; min-width:0;}
+.topbar{display:flex; align-items:center; justify-content:space-between; margin-bottom:30px; gap:16px; flex-wrap:wrap;}
+.topbar h2{font-family:var(--font-display); font-weight:800; font-size:2.2rem; letter-spacing:-.01em;}
+.topbar p{color:var(--text-dim); font-size:.85rem; margin-top:2px;}
+
+/* ============ CARDS / GRID ============ */
+.stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:18px; margin-bottom:28px;}
+.stat-card{
+  background:var(--glass); border:1px solid var(--brd);
+  border-radius:20px; padding:22px; position:relative; overflow:hidden; transition:transform .3s, border-color .3s, box-shadow .3s;
+}
+.stat-card:hover{transform:translateY(-5px); border-color:var(--brd-hi); box-shadow:var(--shadow);}
+.stat-card .ic{width:38px; height:38px; border-radius:11px; display:flex; align-items:center; justify-content:center; margin-bottom:14px;}
+.stat-card .ic i{font-size:1.05rem;}
+.stat-card .num{font-family:var(--font-mono); font-size:1.85rem; font-weight:700; margin:2px 0 4px; color:var(--text); overflow-wrap:break-word;}
+.stat-card .lbl{font-size:.74rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:.07em;}
+.tone-em .ic{background:rgba(23,230,161,.16); color:var(--emerald);}
+.tone-vi .ic{background:rgba(139,107,247,.16); color:var(--violet);}
+.tone-am .ic{background:rgba(255,180,84,.16); color:var(--amber);}
+.tone-ro .ic{background:rgba(255,92,122,.16); color:var(--rose);}
+@media (max-width:1100px){.stat-grid{grid-template-columns:repeat(2,1fr);}}
+
+.card{background:var(--glass); border:1px solid var(--brd); border-radius:22px; padding:24px; backdrop-filter:blur(12px);}
+.section-title{display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; gap:12px; flex-wrap:wrap;}
+.section-title h3{font-family:var(--font-display); font-weight:700; font-size:1.35rem; letter-spacing:-.005em; display:flex; align-items:center; gap:10px;}
+.section-title h3 i{color:var(--emerald); font-size:1.1rem;}
+
+.grid2{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px;}
+
+.player-card{background:rgba(255,255,255,.03); border:1px solid var(--brd); border-radius:18px; padding:18px; transition:transform .25s, border-color .25s;}
+.player-card:hover{transform:translateY(-4px); border-color:var(--emerald);}
+.p-head{display:flex; align-items:center; gap:12px; margin-bottom:12px;}
+.avatar{width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg, var(--emerald), var(--violet)); color:#04140f; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:1rem; flex-shrink:0;}
+.p-head .name{font-weight:700; font-size:1rem;}
+.p-head .role-tag{font-size:.7rem; color:var(--emerald); text-transform:uppercase; letter-spacing:.06em;}
+.p-meta{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;}
+.chip{font-size:.72rem; background:rgba(255,255,255,.05); border:1px solid var(--brd); padding:4px 10px; border-radius:999px; color:var(--text-dim); display:inline-flex; align-items:center; gap:5px;}
+.p-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+.p-fund-line{display:flex; justify-content:space-between; font-size:.78rem; color:var(--text-dim); padding:5px 0; gap:8px;}
+.p-fund-line b{color:var(--text); font-family:var(--font-mono); text-align:right;}
+
+.badge{font-size:.66rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:4px 11px; border-radius:999px; display:inline-flex; align-items:center; gap:5px; white-space:nowrap;}
+.badge-pending{background:var(--pending-bg); color:var(--amber); border:1px solid rgba(255,180,84,.4);}
+.badge-complete{background:var(--success-bg); color:var(--emerald); border:1px solid rgba(23,230,161,.4);}
+.badge-overdue{background:var(--danger-bg); color:var(--rose); border:1px solid rgba(255,92,122,.5);}
+.badge-neutral{background:var(--neutral-bg); color:var(--text-dim); border:1px solid var(--brd);}
+
+.fund-card{background:rgba(255,255,255,.03); border:1px solid var(--brd); border-radius:20px; padding:22px; margin-bottom:16px; transition:border-color .25s;}
+.fund-card:hover{border-color:var(--brd-hi);}
+.fund-top{display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:12px; flex-wrap:wrap;}
+.fund-top-left{display:flex; gap:16px; align-items:center; min-width:0;}
+.fund-top-left h4{overflow-wrap:break-word;}
+.fund-top h4{font-family:var(--font-display); font-weight:700; font-size:1.3rem; letter-spacing:-.005em;}
+.fund-price{font-family:var(--font-mono); color:var(--emerald); font-weight:700; font-size:1.05rem;}
+.fund-meta{display:flex; gap:16px; flex-wrap:wrap; font-size:.78rem; color:var(--text-dim); margin-bottom:14px;}
+.fund-meta b{color:var(--text);}
+.progress-bar{height:9px; background:rgba(255,255,255,.07); border-radius:999px; overflow:hidden; margin-bottom:8px;}
+.progress-fill{height:100%; background:linear-gradient(90deg, var(--emerald), var(--violet)); border-radius:999px; transition:width .6s cubic-bezier(.2,.8,.2,1);}
+.progress-txt{font-size:.74rem; color:var(--text-dim); display:flex; justify-content:space-between; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
+.assign-list{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
+.assign-row{display:flex; align-items:center; justify-content:space-between; background:rgba(255,255,255,.025); padding:10px 14px; border-radius:12px; gap:10px; flex-wrap:wrap;}
+.assign-row .an{font-size:.85rem; font-weight:600;}
+.assign-row .am{font-size:.68rem; color:var(--text-faint); font-family:var(--font-mono);}
+.toggle-status{display:flex; gap:6px;}
+.toggle-status button{border:none; padding:6px 12px; border-radius:999px; font-size:.66rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; background:rgba(255,255,255,.06); color:var(--text-dim); transition:all .2s;}
+.toggle-status button.on.pend{background:var(--pending-bg); color:var(--amber);}
+.toggle-status button.on.comp{background:var(--success-bg); color:var(--emerald);}
+.fund-actions{display:flex; gap:8px; margin-top:14px; border-top:1px dashed var(--brd); padding-top:14px; flex-wrap:wrap;}
+
+/* ring */
+.ring-wrap{position:relative; width:64px; height:64px; flex-shrink:0;}
+.ring{width:64px; height:64px; border-radius:50%;}
+.ring-inner{position:absolute; inset:6px; border-radius:50%; background:var(--bg1); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:.72rem; font-weight:700; color:var(--text);}
+
+.empty{text-align:center; padding:50px 20px; color:var(--text-dim);}
+.empty i{font-size:2.2rem; color:var(--violet); opacity:.6; margin-bottom:14px; display:block;}
+.empty h4{font-family:var(--font-display); font-weight:700; font-size:1.3rem; margin-bottom:6px; color:var(--text);}
+
+/* team status table */
+.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch;}
+table.team-table{width:100%; border-collapse:collapse; font-size:.85rem;}
+table.team-table th{text-align:left; font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--text-dim); padding:10px 14px; border-bottom:1px solid var(--brd); white-space:nowrap;}
+table.team-table td{padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.05); white-space:nowrap;}
+table.team-table tr.self-row td{background:rgba(23,230,161,.06);}
+table.team-table tr.self-row td:first-child{border-left:3px solid var(--emerald);}
+table.team-table tr:hover td{background:rgba(255,255,255,.03);}
+.namecell{display:flex; align-items:center; gap:10px;}
+.mono{font-family:var(--font-mono);}
+
+/* ============ CHAT ============ */
+.chat-shell{display:grid; grid-template-columns:280px 1fr; gap:0; border:1px solid var(--brd); border-radius:20px; overflow:hidden; background:rgba(255,255,255,.02); min-height:560px;}
+.chat-list{border-right:1px solid var(--brd); overflow-y:auto; max-height:640px;}
+.chat-list-item{display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; transition:background .2s;}
+.chat-list-item:hover{background:rgba(255,255,255,.04);}
+.chat-list-item.active{background:rgba(23,230,161,.1); border-right:3px solid var(--emerald);}
+.chat-list-item .ci-name{font-weight:700; font-size:.88rem;}
+.chat-list-item .ci-prev{font-size:.74rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px;}
+.chat-panel{display:flex; flex-direction:column; min-height:560px; min-width:0;}
+.chat-head{padding:16px 20px; border-bottom:1px solid var(--brd); display:flex; align-items:center; gap:12px;}
+.chat-body{flex:1; padding:20px; overflow-y:auto; display:flex; flex-direction:column; gap:10px; max-height:460px;}
+.bubble{max-width:72%; padding:11px 15px; border-radius:16px; font-size:.87rem; line-height:1.4; animation:pop .3s ease both; overflow-wrap:break-word;}
+.bubble.me{align-self:flex-end; background:linear-gradient(120deg, var(--emerald), var(--violet)); color:#04140f; border-bottom-right-radius:4px;}
+.bubble.them{align-self:flex-start; background:rgba(255,255,255,.06); border:1px solid var(--brd); border-bottom-left-radius:4px;}
+.bubble .bt{display:block; font-size:.64rem; opacity:.65; margin-top:5px;}
+.chat-input{display:flex; gap:10px; padding:16px 20px; border-top:1px solid var(--brd);}
+.chat-input input{flex:1; min-width:0;}
+
+/* ============ MODAL / TOAST ============ */
+.modal-overlay{position:fixed; inset:0; background:rgba(3,6,14,.75); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; animation:fadeIn .2s ease;}
+@keyframes fadeIn{from{opacity:0;} to{opacity:1;}}
+.modal-box{background:var(--bg1); border:1px solid var(--brd-hi); border-radius:22px; padding:28px; max-width:460px; width:100%; box-shadow:var(--shadow); animation:pop .3s cubic-bezier(.34,1.56,.64,1) both; max-height:88vh; overflow-y:auto;}
+.modal-box h3{font-family:var(--font-display); font-weight:700; font-size:1.5rem; margin-bottom:16px; letter-spacing:-.01em;}
+.modal-close{float:right; background:none; border:none; color:var(--text-dim); font-size:1.2rem; padding:6px; margin:-6px -6px 0 0;}
+.toast-box{position:fixed; top:20px; right:20px; left:20px; z-index:200; display:flex; flex-direction:column; align-items:flex-end; gap:10px; pointer-events:none;}
+.toast{
+  background:var(--bg1); border:1px solid var(--brd-hi); border-left:4px solid var(--emerald);
+  padding:14px 18px; border-radius:14px; min-width:240px; max-width:100%; box-shadow:var(--shadow); font-size:.86rem;
+  animation:slideIn .35s ease both; display:flex; align-items:center; gap:10px; pointer-events:auto;
+}
+.toast.err{border-left-color:var(--rose);}
+@keyframes slideIn{from{opacity:0; transform:translateX(40px);} to{opacity:1; transform:translateX(0);}}
+
+/* ============ BOOT / CONFIG SCREENS ============ */
+.boot-wrap{min-height:100vh; display:flex; align-items:center; justify-content:center; padding:30px; text-align:center;}
+.boot-spin{width:52px; height:52px; border-radius:50%; border:4px solid rgba(255,255,255,.12); border-top-color:var(--emerald); animation:spin 0.9s linear infinite; margin:0 auto 18px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.cfg-card{max-width:600px; width:100%; background:rgba(10,15,34,.7); border:1px solid var(--brd); border-radius:24px; padding:36px; text-align:left; box-shadow:var(--shadow);}
+.cfg-card h2{font-family:var(--font-display); font-size:1.6rem; margin-bottom:10px;}
+.cfg-card p{color:var(--text-dim); font-size:.88rem; line-height:1.6; margin-bottom:10px;}
+.cfg-card code{background:rgba(255,255,255,.07); padding:2px 7px; border-radius:6px; font-family:var(--font-mono); font-size:.82rem;}
+.cfg-card ol{color:var(--text-dim); font-size:.86rem; line-height:1.9; margin:14px 0 0 20px;}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:900px){
+  .shell{flex-direction:column;}
+  .sidebar{
+    width:100%; height:auto; position:sticky; top:0; z-index:50; flex-direction:row; align-items:center;
+    overflow-x:auto; padding:10px 12px; gap:6px; flex-wrap:nowrap; -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .sidebar::-webkit-scrollbar{display:none;}
+  .sb-brand{padding:0 10px 0 0; flex-shrink:0;}
+  .sb-brand small{display:none;}
+  .nav-item{flex-shrink:0; width:auto; flex-direction:column; font-size:.64rem; padding:8px 12px; gap:4px;}
+  .nav-item.active::before{display:none;}
+  .nav-badge{position:absolute; top:2px; right:2px; margin:0;}
+  .sb-foot{margin-top:0; padding-top:0; border-top:none; margin-left:auto; flex-shrink:0;}
+  .sb-foot span{display:none;}
+  .sb-foot .btn{padding:10px 14px;}
+  .main{padding:20px 16px;}
+  .topbar{margin-bottom:22px;}
+  .topbar h2{font-size:1.6rem;}
+  .topbar p{font-size:.8rem;}
+  .stat-grid{grid-template-columns:1fr 1fr; gap:12px;}
+  .stat-card{padding:16px;}
+  .stat-card .num{font-size:1.35rem;}
+  .stat-card .lbl{font-size:.66rem;}
+  .card{padding:18px;}
+  .chat-shell{grid-template-columns:1fr;}
+  .row2{grid-template-columns:1fr;}
+  .grid2{grid-template-columns:1fr;}
+  .grid2[style]{grid-template-columns:1fr !important;}
+}
+@media (max-width:640px){
+  .hero-wrap{padding:40px 16px;}
+  .brand{margin-bottom:36px;}
+  .brand h1{font-size:2rem;}
+  .ball{width:56px; height:56px;}
+  .auth-card{padding:30px 22px; border-radius:22px;}
+  .auth-title{font-size:1.7rem;}
+  .row2{grid-template-columns:1fr; gap:0;}
+  .pill-select{gap:8px;}
+  .pill-select label{min-width:80px;}
+  /* prevent iOS auto-zoom on focus */
+  .field input, .field select, .field textarea{font-size:16px;}
+  .modal-box{padding:20px; border-radius:18px; max-height:92vh;}
+  .modal-box h3{font-size:1.25rem;}
+  .fund-top{gap:10px;}
+  .fund-top-left{gap:10px; width:100%;}
+  .fund-price{font-size:.95rem;}
+  .ring-wrap, .ring{width:50px; height:50px;}
+  .fund-card{padding:16px;}
+  .fund-meta{gap:10px; font-size:.72rem;}
+  .assign-row{padding:9px 12px; flex-direction:column; align-items:flex-start;}
+  .assign-row .toggle-status{width:100%;}
+  .toggle-status button{flex:1;}
+  .fund-actions{flex-direction:column;}
+  .fund-actions .btn{width:100%;}
+  .p-actions{flex-direction:column;}
+  .p-actions .btn{width:100%;}
+  .section-title h3{font-size:1.1rem;}
+  .chat-input input{font-size:16px;}
+  .chat-body{max-height:360px;}
+  .bubble{max-width:88%;}
+  .toast-box{top:12px; right:12px; left:12px;}
+  .toast{min-width:0; width:100%;}
+}
+@media (max-width:480px){
+  .stat-grid{grid-template-columns:1fr;}
+  .auth-card{padding:26px 18px;}
+  .brand h1{font-size:1.7rem;}
+  .brand span{font-size:.64rem; letter-spacing:.22em;}
+  .topbar{flex-direction:column; align-items:flex-start;}
+  .p-head{gap:10px;}
+  .p-fund-line{font-size:.72rem;}
+  .fund-meta span{flex:1 1 100%;}
+}
+</style>
+</head>
+<body>
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<div class="blob blob3"></div>
+<div id="toastBox" class="toast-box"></div>
+<div id="app"></div>
+
+<script>
+/* =========================================================
+   RISING STARS — TEAM & FUND MANAGER
+   Single-file app. Data is stored permanently in Firebase
+   Firestore (cloud database) so it is shared and persists
+   across every device/mobile that opens this website —
+   nothing is lost, and no mobile number can register twice.
+========================================================= */
+
+/* ---------- 1) PUT YOUR FIREBASE PROJECT CONFIG HERE ---------- */
+/*
+  How to get this (free, takes ~3 minutes):
+  1. Go to https://console.firebase.google.com and create a project.
+  2. Click "Build" -> "Firestore Database" -> "Create database" -> Start in TEST mode (or set rules below).
+  3. Click the gear icon -> "Project settings" -> scroll to "Your apps" -> click the </> (Web) icon -> register app.
+  4. Copy the firebaseConfig object it gives you and paste the values below.
+  5. (Recommended) In Firestore -> Rules, use something like:
+     rules_version = '2';
+     service cloud.firestore {
+       match /databases/{database}/documents {
+         match /{document=**} { allow read, write: if true; }
+       }
+     }
+     (This keeps it simple for a small private team app. For stronger security you
+      can later restrict writes, e.g. using Firebase App Check.)
+*/
+
+// import { initializeApp } from "firebase/app";
+// import { getAnalytics } from "firebase/analytics";
+
+
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBw8CnUexpET4ZHltdT01WgYJweNL3nHMU",
+  authDomain: "risingstars-40939.firebaseapp.com",
+  projectId: "risingstars-40939",
+  storageBucket: "risingstars-40939.firebasestorage.app",
+  messagingSenderId: "396307309534",
+  appId: "1:396307309534:web:cfd0876b6ac2f95b3d734f",
+  measurementId: "G-0TT4J43S7G"
+};
+
+// const app = initializeApp(firebaseConfig);
+// const analytics = getAnalytics(app);
+
+/* ---------- CONSTANTS ---------- */
+const ADMIN_USERNAME = 'Ahmad';
+const ADMIN_PASSWORD = 'Ahmad@786';
+const SESSION_KEY = 'gwcc_session_v3'; // per-device login state only (not team data)
+
+/* ---------- LOCAL CACHE (mirrors Firestore) ---------- */
+let db = { players:[], funds:[], messages:[] };
+let fdb = null; // firestore instance
+let firebaseReady = false;
+
+function loadSession(){
+  try{ return JSON.parse(localStorage.getItem(SESSION_KEY)) || {role:null, playerId:null}; }
+  catch(e){ return {role:null, playerId:null}; }
+}
+function saveSession(){ localStorage.setItem(SESSION_KEY, JSON.stringify(session)); }
+let session = loadSession();
+
+/* ---------- HELPERS ---------- */
+function uid(){ return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function initials(name){ return (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+function normalizeMobile(m){ return String(m||'').replace(/\D/g,''); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDate(d){ if(!d) return '—'; const dt = new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtMoney(n){ return 'Rs ' + Number(n||0).toLocaleString('en-PK'); }
+function daysLeft(deadline){
+  if(!deadline) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dl = new Date(deadline+'T00:00:00');
+  return Math.round((dl-today)/86400000);
+}
+function timeAgo(ts){
+  const diff = Date.now()-ts;
+  const m = Math.floor(diff/60000);
+  if(m<1) return 'just now';
+  if(m<60) return m+'m ago';
+  const h = Math.floor(m/60);
+  if(h<24) return h+'h ago';
+  return new Date(ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+}
+function toast(msg, type='ok', icon='fa-circle-check'){
+  const box = document.getElementById('toastBox');
+  const el = document.createElement('div');
+  el.className = 'toast ' + (type==='err'?'err':'');
+  el.innerHTML = `<i class="fa-solid ${type==='err'?'fa-circle-exclamation':icon}"></i><span>${esc(msg)}</span>`;
+  box.appendChild(el);
+  setTimeout(()=>{ el.style.transition='all .35s ease'; el.style.opacity='0'; el.style.transform='translateX(40px)'; setTimeout(()=>el.remove(),350); }, 2900);
+}
+function closeModal(){ const m = document.getElementById('modalOverlay'); if(m) m.remove(); }
+function openModal(title, bodyHTML){
+  closeModal();
+  const wrap = document.createElement('div');
+  wrap.id = 'modalOverlay';
+  wrap.className = 'modal-overlay';
+  wrap.innerHTML = `<div class="modal-box"><button class="modal-close" onclick="closeModal()"><i class="fa-solid fa-xmark"></i></button><h3>${title}</h3>${bodyHTML}</div>`;
+  wrap.addEventListener('mousedown', e=>{ if(e.target===wrap) closeModal(); });
+  document.body.appendChild(wrap);
+}
+function animateCounters(root){
+  const els = (root||document).querySelectorAll('[data-count]');
+  els.forEach(el=>{
+    const target = Number(el.getAttribute('data-count'))||0;
+    const isMoney = el.getAttribute('data-money')==='1';
+    const dur = 700; const start = performance.now();
+    function step(now){
+      const p = Math.min(1,(now-start)/dur);
+      const eased = 1-Math.pow(1-p,3);
+      const val = Math.round(target*eased);
+      el.textContent = isMoney ? fmtMoney(val) : val;
+      if(p<1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  });
+}
+function busy(on){
+  let el = document.getElementById('busyOverlay');
+  if(on){
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'busyOverlay';
+      el.style.cssText = 'position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(3,6,14,.35);backdrop-filter:blur(2px);';
+      el.innerHTML = '<div class="boot-spin"></div>';
+      document.body.appendChild(el);
+    }
+  } else if(el){ el.remove(); }
+}
+
+/* =========================================================
+   FIRESTORE DATA LAYER
+========================================================= */
+function isConfigured(){
+  return FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf('YOUR_') !== 0;
+}
+
+async function initFirebase(){
+  firebase.initializeApp(FIREBASE_CONFIG);
+  fdb = firebase.firestore();
+  await fetchAllData();
+  firebaseReady = true;
+}
+
+async function fetchAllData(){
+  const [playersSnap, fundsSnap, messagesSnap] = await Promise.all([
+    fdb.collection('players').get(),
+    fdb.collection('funds').get(),
+    fdb.collection('messages').get()
+  ]);
+  db.players = playersSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+  db.funds = fundsSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+  db.messages = messagesSnap.docs.map(d=>({ id:d.id, ...d.data() }));
+}
+async function refetchPlayers(){ const s = await fdb.collection('players').get(); db.players = s.docs.map(d=>({id:d.id, ...d.data()})); }
+async function refetchFunds(){ const s = await fdb.collection('funds').get(); db.funds = s.docs.map(d=>({id:d.id, ...d.data()})); }
+async function refetchMessages(){ const s = await fdb.collection('messages').get(); db.messages = s.docs.map(d=>({id:d.id, ...d.data()})); }
+
+/* ---- Players ---- */
+async function registerPlayerRemote(player){
+  const docId = normalizeMobile(player.mobile);
+  const ref = fdb.collection('players').doc(docId);
+  await fdb.runTransaction(async t=>{
+    const doc = await t.get(ref);
+    if(doc.exists){ throw new Error('DUPLICATE_MOBILE'); }
+    t.set(ref, player);
+  });
+  db.players.push({ id:docId, ...player });
+  return docId;
+}
+async function findPlayerRemote(mobile){
+  const docId = normalizeMobile(mobile);
+  const doc = await fdb.collection('players').doc(docId).get();
+  if(!doc.exists) return null;
+  return { id:doc.id, ...doc.data() };
+}
+async function updatePlayerNameRemote(id, name){
+  await fdb.collection('players').doc(id).update({ name });
+  const p = db.players.find(x=>x.id===id); if(p) p.name = name;
+}
+async function deletePlayerRemote(id){
+  const batch = fdb.batch();
+  batch.delete(fdb.collection('players').doc(id));
+  const msgSnap = await fdb.collection('messages').where('playerId','==',id).get();
+  msgSnap.forEach(d=> batch.delete(d.ref));
+  await batch.commit();
+  // strip this player from every fund's assigned list
+  const affected = db.funds.filter(f=> f.assigned.some(a=>a.playerId===id));
+  await Promise.all(affected.map(f=>{
+    const newAssigned = f.assigned.filter(a=>a.playerId!==id);
+    return fdb.collection('funds').doc(f.id).update({ assigned:newAssigned }).then(()=>{ f.assigned = newAssigned; });
+  }));
+  db.players = db.players.filter(p=>p.id!==id);
+  db.messages = db.messages.filter(m=>m.playerId!==id);
+}
+async function clearPlayerFundHistoryRemote(id){
+  const affected = db.funds.filter(f=> f.assigned.some(a=>a.playerId===id));
+  await Promise.all(affected.map(f=>{
+    const newAssigned = f.assigned.filter(a=>a.playerId!==id);
+    return fdb.collection('funds').doc(f.id).update({ assigned:newAssigned }).then(()=>{ f.assigned = newAssigned; });
+  }));
+}
+
+/* ---- Funds ---- */
+async function createFundRemote(fund){
+  const ref = await fdb.collection('funds').add(fund);
+  db.funds.push({ id:ref.id, ...fund });
+  return ref.id;
+}
+async function updateFundRemote(id, patch){
+  await fdb.collection('funds').doc(id).update(patch);
+  const f = db.funds.find(x=>x.id===id); if(f) Object.assign(f, patch);
+}
+async function deleteFundRemote(id){
+  await fdb.collection('funds').doc(id).delete();
+  db.funds = db.funds.filter(f=>f.id!==id);
+}
+
+/* ---- Messages ---- */
+async function addMessageRemote(msg){
+  const ref = await fdb.collection('messages').add(msg);
+  db.messages.push({ id:ref.id, ...msg });
+  return ref.id;
+}
+async function clearChatRemote(playerId){
+  const snap = await fdb.collection('messages').where('playerId','==',playerId).get();
+  const batch = fdb.batch();
+  snap.forEach(d=> batch.delete(d.ref));
+  await batch.commit();
+  db.messages = db.messages.filter(m=>m.playerId!==playerId);
+}
+async function markReadRemote(msgIds, field){
+  if(msgIds.length===0) return;
+  const batch = fdb.batch();
+  msgIds.forEach(id=> batch.update(fdb.collection('messages').doc(id), { [field]: true }));
+  await batch.commit().catch(()=>{});
+  msgIds.forEach(id=>{ const m = db.messages.find(x=>x.id===id); if(m) m[field]=true; });
+}
+
+/* ---- FUND CALC HELPERS ---- */
+function fundStats(fund){
+  const total = fund.assigned.length;
+  const complete = fund.assigned.filter(a=>a.status==='complete').length;
+  const pending = total-complete;
+  return {
+    total, complete, pending,
+    totalValue: fund.price*total,
+    collected: fund.price*complete,
+    remaining: fund.price*pending,
+    pct: total? Math.round((complete/total)*100) : 0
+  };
+}
+function allFundStats(){
+  let totalValue=0, collected=0, remaining=0;
+  db.funds.forEach(f=>{ const s = fundStats(f); totalValue+=s.totalValue; collected+=s.collected; remaining+=s.remaining; });
+  return {totalValue, collected, remaining};
+}
+function playerFunds(playerId){
+  return db.funds.filter(f=>f.assigned.some(a=>a.playerId===playerId))
+    .map(f=>({ fund:f, entry: f.assigned.find(a=>a.playerId===playerId) }));
+}
+function playerAggregate(playerId){
+  const items = playerFunds(playerId);
+  let totalAssigned=0, totalPaid=0, pendingCount=0, completeCount=0, lastPaidDate=null;
+  items.forEach(it=>{
+    totalAssigned += it.fund.price;
+    if(it.entry.status==='complete'){
+      totalPaid += it.fund.price; completeCount++;
+      if(it.entry.paidDate && (!lastPaidDate || it.entry.paidDate>lastPaidDate)) lastPaidDate = it.entry.paidDate;
+    } else { pendingCount++; }
+  });
+  const totalRemaining = totalAssigned-totalPaid;
+  const fullyPaid = items.length>0 && pendingCount===0;
+  return { items, totalAssigned, totalPaid, totalRemaining, pendingCount, completeCount, lastPaidDate, fullyPaid, hasAny: items.length>0 };
+}
+function teamStats(){
+  const totals = allFundStats();
+  let fullyPaid=0, withPending=0;
+  db.players.forEach(p=>{
+    const agg = playerAggregate(p.id);
+    if(agg.hasAny){ if(agg.fullyPaid) fullyPaid++; else withPending++; }
+  });
+  return {
+    totalPlayers: db.players.length,
+    totalAssigned: totals.totalValue,
+    totalCollected: totals.collected,
+    totalRemaining: totals.remaining,
+    playersFullyPaid: fullyPaid,
+    playersWithPending: withPending
+  };
+}
+function unreadForAdmin(){
+  return db.messages.filter(m=>m.sender==='player' && !m.readByAdmin).length;
+}
+function unreadForPlayer(playerId){
+  return db.messages.filter(m=>m.playerId===playerId && m.sender==='admin' && !m.readByPlayer).length;
+}
+
+/* ---------- SHARED: TEAM FUND STATUS TABLE ---------- */
+function teamStatusTableHTML(highlightPlayerId){
+  if(db.players.length===0){
+    return `<div class="empty"><i class="fa-solid fa-users"></i><h4>No players yet</h4><p>Registered players and their fund status will appear here.</p></div>`;
+  }
+  const rows = db.players.map(p=>({p, agg: playerAggregate(p.id)}));
+  return `<div class="table-wrap"><table class="team-table">
+    <thead><tr>
+      <th>Player</th><th>Mobile</th><th>Assigned</th><th>Paid</th><th>Remaining</th><th>Last Payment</th><th>Status</th>
+    </tr></thead>
+    <tbody>
+      ${rows.map(({p,agg})=>{
+        const statusBadge = !agg.hasAny ? `<span class="badge badge-neutral"><i class="fa-solid fa-minus"></i> Not Assigned</span>`
+          : agg.fullyPaid ? `<span class="badge badge-complete"><i class="fa-solid fa-circle-check"></i> Paid in Full</span>`
+          : `<span class="badge badge-pending"><i class="fa-solid fa-hourglass-half"></i> Pending</span>`;
+        return `<tr class="${p.id===highlightPlayerId?'self-row':''}">
+          <td><div class="namecell"><div class="avatar" style="width:30px;height:30px;font-size:.68rem;">${initials(p.name)}</div>${esc(p.name)}${p.id===highlightPlayerId?' <span style="color:var(--emerald); font-size:.7rem;">(You)</span>':''}</div></td>
+          <td class="mono">${esc(p.mobile)}</td>
+          <td class="mono">${fmtMoney(agg.totalAssigned)}</td>
+          <td class="mono" style="color:var(--emerald);">${fmtMoney(agg.totalPaid)}</td>
+          <td class="mono" style="color:var(--amber);">${fmtMoney(agg.totalRemaining)}</td>
+          <td>${agg.lastPaidDate? fmtDate(agg.lastPaidDate) : '—'}</td>
+          <td>${statusBadge}</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function globalStatCardsHTML(){
+  const t = teamStats();
+  return `
+  <div class="stat-grid stagger">
+    <div class="stat-card fadeUp tone-em"><div class="ic"><i class="fa-solid fa-users"></i></div><div class="num" data-count="${t.totalPlayers}">0</div><div class="lbl">Total Players</div></div>
+    <div class="stat-card fadeUp tone-vi"><div class="ic"><i class="fa-solid fa-coins"></i></div><div class="num" data-count="${t.totalAssigned}" data-money="1">Rs 0</div><div class="lbl">Total Fund Assigned</div></div>
+    <div class="stat-card fadeUp tone-em"><div class="ic"><i class="fa-solid fa-circle-check"></i></div><div class="num" data-count="${t.totalCollected}" data-money="1">Rs 0</div><div class="lbl">Total Fund Collected</div></div>
+    <div class="stat-card fadeUp tone-am"><div class="ic"><i class="fa-solid fa-hourglass-half"></i></div><div class="num" data-count="${t.totalRemaining}" data-money="1">Rs 0</div><div class="lbl">Total Remaining</div></div>
+    <div class="stat-card fadeUp tone-em"><div class="ic"><i class="fa-solid fa-user-check"></i></div><div class="num" data-count="${t.playersFullyPaid}">0</div><div class="lbl">Players Completed</div></div>
+    <div class="stat-card fadeUp tone-ro"><div class="ic"><i class="fa-solid fa-user-clock"></i></div><div class="num" data-count="${t.playersWithPending}">0</div><div class="lbl">Players Pending</div></div>
+  </div>`;
+}
+
+/* =========================================================
+   ROUTER
+========================================================= */
+let adminTab = 'overview';
+let activeChatPlayerId = null;
+let chatPollTimer = null;
+
+function render(){
+  if(session.role==='admin') return renderAdminDashboard();
+  if(session.role==='player') return renderPlayerDashboard();
+  return renderRoleSelect();
+}
+
+/* ---------- ROLE SELECT ---------- */
+function renderRoleSelect(){
+  stopChatPoll();
+  document.getElementById('app').innerHTML = `
+  <div class="hero-wrap fadeUp">
+    <div class="brand">
+      <div class="ball"></div>
+      <h1>Rising Stars</h1>
+      <span>Team &amp; Fund Manager</span>
+    </div>
+    <div class="role-grid stagger">
+      <div class="role-card fadeUp" onclick="goAdminLogin()">
+        <div class="ic"><i class="fa-solid fa-user-shield"></i></div>
+        <h3>Captain / Admin</h3>
+        <p>Manage the team, funds and players. Single fixed admin account.</p>
+      </div>
+      <div class="role-card fadeUp" onclick="goPlayerAuth()">
+        <div class="ic"><i class="fa-solid fa-cricket-bat-ball"></i></div>
+        <h3>Player</h3>
+        <p>Register or log in to view your profile, fund status and messages.</p>
+      </div>
+    </div>
+  </div>`;
+}
+function goAdminLogin(){ renderAdminLogin(); }
+function goPlayerAuth(){ playerAuthMode='login'; renderPlayerAuth(); }
+
+/* ---------- ADMIN LOGIN ---------- */
+function renderAdminLogin(){
+  document.getElementById('app').innerHTML = `
+  <div class="auth-wrap">
+    <div class="auth-card fadeUp">
+      <button class="back-btn" onclick="renderRoleSelect()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+      <div class="admin-badge"><i class="fa-solid fa-shield-halved"></i> Captain Access</div>
+      <div class="auth-title">Admin Login</div>
+      <div class="auth-sub">Sign in to manage the team fund and players.</div>
+      <div id="loginErr" class="err-box"></div>
+      <form id="adminLoginForm">
+        <div class="field">
+          <label>Username</label>
+          <input type="text" id="au" placeholder="Username" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="ap" placeholder="Password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Login as Captain <i class="fa-solid fa-arrow-right-to-bracket"></i></button>
+      </form>
+    </div>
+  </div>`;
+  document.getElementById('adminLoginForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const u = document.getElementById('au').value.trim();
+    const p = document.getElementById('ap').value;
+    const errBox = document.getElementById('loginErr');
+    if(u===ADMIN_USERNAME && p===ADMIN_PASSWORD){
+      busy(true);
+      try{ await fetchAllData(); }catch(e){ toast('Could not load data: '+e.message,'err'); busy(false); return; }
+      busy(false);
+      session = {role:'admin', playerId:null}; saveSession();
+      adminTab='overview';
+      toast('Welcome back, Captain '+ADMIN_USERNAME+'!');
+      render();
+    } else {
+      errBox.textContent = 'Incorrect username or password. Please try again.';
+      errBox.classList.add('show');
+    }
+  });
+}
+
+/* ---------- PLAYER AUTH ---------- */
+let playerAuthMode = 'login';
+function switchAuthMode(mode){ playerAuthMode = mode; renderPlayerAuth(); }
+
+function renderPlayerAuth(){
+  document.getElementById('app').innerHTML = `
+  <div class="auth-wrap">
+    <div class="auth-card fadeUp" style="max-width:490px;">
+      <button class="back-btn" onclick="renderRoleSelect()"><i class="fa-solid fa-arrow-left"></i> Back</button>
+      <div class="auth-title">Player ${playerAuthMode==='login'?'Login':'Registration'}</div>
+      <div class="auth-sub">${playerAuthMode==='login' ? 'Sign in with your mobile number and password.' : 'Fill in your details to join the team.'}</div>
+      <div class="seg">
+        <button class="${playerAuthMode==='login'?'active':''}" onclick="switchAuthMode('login')">Login</button>
+        <button class="${playerAuthMode==='register'?'active':''}" onclick="switchAuthMode('register')">Register</button>
+      </div>
+      <div id="authErr" class="err-box"></div>
+      <div id="authFormHolder"></div>
+    </div>
+  </div>`;
+  if(playerAuthMode==='login') renderPlayerLoginForm(); else renderPlayerRegisterForm();
+}
+
+function renderPlayerLoginForm(){
+  document.getElementById('authFormHolder').innerHTML = `
+    <form id="playerLoginForm">
+      <div class="field">
+        <label>Mobile Number</label>
+        <input type="tel" id="lMobile" placeholder="03xxxxxxxxx" required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="lPass" placeholder="Password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Login <i class="fa-solid fa-arrow-right-to-bracket"></i></button>
+      <div class="hint">Don't have an account? <button type="button" class="link-btn" onclick="switchAuthMode('register')">Register now</button></div>
+    </form>`;
+  document.getElementById('playerLoginForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const mobile = document.getElementById('lMobile').value;
+    const pass = document.getElementById('lPass').value;
+    const errBox = document.getElementById('authErr');
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    try{
+      const p = await findPlayerRemote(mobile);
+      if(!p || p.password!==pass){
+        errBox.textContent = 'Mobile number or password is incorrect.';
+        errBox.classList.add('show');
+        submitBtn.disabled = false;
+        return;
+      }
+      busy(true);
+      await fetchAllData();
+      busy(false);
+      session = {role:'player', playerId:p.id}; saveSession();
+      toast('Welcome back, '+p.name+'!');
+      render();
+    }catch(err){
+      busy(false);
+      errBox.textContent = 'Network error: '+err.message;
+      errBox.classList.add('show');
+    }
+    submitBtn.disabled = false;
+  });
+}
+
+function renderPlayerRegisterForm(){
+  document.getElementById('authFormHolder').innerHTML = `
+    <form id="playerRegForm">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="rName" placeholder="Enter your full name" required>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Mobile Number</label>
+          <input type="tel" id="rMobile" placeholder="03xxxxxxxxx" pattern="[0-9]{10,12}" required>
+        </div>
+        <div class="field">
+          <label>Age</label>
+          <input type="number" id="rAge" placeholder="Age" min="8" max="70" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Gender</label>
+        <div class="pill-select">
+          <label><input type="radio" name="gender" value="Male" checked><span class="pill">Male</span></label>
+          <label><input type="radio" name="gender" value="Female"><span class="pill">Female</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Playing Role</label>
+        <div class="pill-select">
+          <label><input type="radio" name="prole" value="Batsman" checked><span class="pill"><i class="fa-solid fa-baseball-bat-ball"></i> Batsman</span></label>
+          <label><input type="radio" name="prole" value="Bowler"><span class="pill"><i class="fa-solid fa-baseball"></i> Bowler</span></label>
+          <label><input type="radio" name="prole" value="All-Rounder"><span class="pill"><i class="fa-solid fa-shield"></i> All-Rounder</span></label>
+        </div>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" id="rPass" placeholder="Create a password" minlength="4" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">Create Account <i class="fa-solid fa-user-plus"></i></button>
+      <div class="hint">Already have an account? <button type="button" class="link-btn" onclick="switchAuthMode('login')">Login</button></div>
+    </form>`;
+  document.getElementById('playerRegForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const errBox = document.getElementById('authErr');
+    errBox.classList.remove('show');
+    const name = document.getElementById('rName').value.trim();
+    const mobileRaw = document.getElementById('rMobile').value.trim();
+    const age = document.getElementById('rAge').value;
+    const pass = document.getElementById('rPass').value;
+    const gender = document.querySelector('input[name=gender]:checked').value;
+    const prole = document.querySelector('input[name=prole]:checked').value;
+    if(!name || !mobileRaw || !age || !pass){
+      errBox.textContent = 'Please fill in all required fields.';
+      errBox.classList.add('show'); return;
+    }
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true;
+    const player = { name, mobile:mobileRaw, age:Number(age), gender, role:prole, password:pass, createdAt:Date.now() };
+    try{
+      const newId = await registerPlayerRemote(player);
+      session = {role:'player', playerId:newId}; saveSession();
+      busy(true);
+      await fetchAllData();
+      busy(false);
+      toast('Registration successful! Welcome, '+name);
+      render();
+    }catch(err){
+      busy(false);
+      if(err.message==='DUPLICATE_MOBILE'){
+        errBox.textContent = 'This mobile number is already registered. Please log in instead.';
+      } else {
+        errBox.textContent = 'Could not register: '+err.message;
+      }
+      errBox.classList.add('show');
+      submitBtn.disabled = false;
+    }
+  });
+}
+
+/* =========================================================
+   PLAYER DASHBOARD
+========================================================= */
+function currentPlayer(){ return db.players.find(p=>p.id===session.playerId); }
+
+function logout(){
+  stopChatPoll();
+  session = {role:null, playerId:null}; saveSession();
+  renderRoleSelect();
+}
+
+function startChatPoll(fn){
+  stopChatPoll();
+  chatPollTimer = setInterval(fn, 6000);
+}
+function stopChatPoll(){ if(chatPollTimer){ clearInterval(chatPollTimer); chatPollTimer=null; } }
+
+async function renderPlayerDashboard(){
+  const p = currentPlayer();
+  if(!p){ logout(); return; }
+  const agg = playerAggregate(p.id);
+  const unread = unreadForPlayer(p.id);
+  const msgs = db.messages.filter(m=>m.playerId===p.id).sort((a,b)=>a.ts-b.ts);
+  const toMark = msgs.filter(m=>m.sender==='admin' && !m.readByPlayer).map(m=>m.id);
+
+  document.getElementById('app').innerHTML = `
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sb-brand"><div class="sb-ball"></div><div><strong>Rising Stars</strong><small>Player Panel</small></div></div>
+      <button class="nav-item active"><i class="fa-solid fa-gauge"></i> <span>Dashboard</span></button>
+      <div class="sb-foot">
+        <button class="btn btn-ghost btn-block" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> <span>Logout</span></button>
+      </div>
+    </aside>
+    <main class="main">
+      <div class="topbar fadeUp">
+        <div>
+          <h2>Hi, ${esc(p.name.split(' ')[0])} 👋</h2>
+          <p>Logged in as <b>${esc(p.name)}</b> · ${esc(p.mobile)} · ${esc(p.role)}</p>
+        </div>
+        <div class="avatar" style="width:52px;height:52px;font-size:1.2rem;">${initials(p.name)}</div>
+      </div>
+
+      <div class="section-title"><h3><i class="fa-solid fa-user-large"></i> Your Fund Summary</h3></div>
+      <div class="stat-grid stagger" style="margin-bottom:34px;">
+        <div class="stat-card fadeUp tone-em"><div class="ic"><i class="fa-solid fa-sack-dollar"></i></div><div class="num" data-count="${agg.totalAssigned}" data-money="1">Rs 0</div><div class="lbl">Total Assigned to You</div></div>
+        <div class="stat-card fadeUp tone-em"><div class="ic"><i class="fa-solid fa-circle-check"></i></div><div class="num" data-count="${agg.totalPaid}" data-money="1">Rs 0</div><div class="lbl">Total You've Paid</div></div>
+        <div class="stat-card fadeUp tone-am"><div class="ic"><i class="fa-solid fa-hourglass-half"></i></div><div class="num" data-count="${agg.totalRemaining}" data-money="1">Rs 0</div><div class="lbl">Remaining</div></div>
+        <div class="stat-card fadeUp tone-vi"><div class="ic"><i class="fa-solid fa-message"></i></div><div class="num" data-count="${unread}">0</div><div class="lbl">New Replies</div></div>
+      </div>
+
+      <div class="section-title"><h3><i class="fa-solid fa-earth-asia"></i> Club-Wide Fund Totals</h3></div>
+      ${globalStatCardsHTML()}
+
+      <div class="grid2" style="grid-template-columns:1.15fr .85fr; align-items:start; margin-top:8px;">
+        <div class="card fadeUp">
+          <div class="section-title"><h3><i class="fa-solid fa-list-check"></i> My Assigned Funds</h3></div>
+          ${agg.items.length===0 ? `<div class="empty"><i class="fa-solid fa-box-open"></i><h4>No funds assigned yet</h4><p>The Captain will add fund details for you soon.</p></div>` :
+          agg.items.map(it=>{
+            const d = it.fund; const st = it.entry;
+            const dl = daysLeft(d.deadline);
+            let dlBadge = '';
+            if(st.status!=='complete'){
+              if(dl!==null && dl<0) dlBadge = `<span class="badge badge-overdue"><i class="fa-solid fa-triangle-exclamation"></i> Overdue ${Math.abs(dl)}d</span>`;
+              else if(dl!==null) dlBadge = `<span class="badge badge-pending"><i class="fa-solid fa-clock"></i> ${dl}d left</span>`;
+            }
+            return `
+            <div class="fund-card">
+              <div class="fund-top">
+                <h4>${esc(d.item)}</h4>
+                <span class="fund-price">${fmtMoney(d.price)}</span>
+              </div>
+              <div class="fund-meta">
+                <span><i class="fa-solid fa-calendar-day"></i> Start: <b>${fmtDate(d.startDate)}</b></span>
+                <span><i class="fa-solid fa-flag-checkered"></i> Deadline: <b>${fmtDate(d.deadline)}</b></span>
+                ${st.status==='complete' ? `<span><i class="fa-solid fa-money-bill-transfer"></i> Paid on: <b>${fmtDate(st.paidDate)}</b></span>` : ''}
+              </div>
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                ${st.status==='complete' ? '<span class="badge badge-complete"><i class="fa-solid fa-check"></i> Complete</span>' : '<span class="badge badge-pending"><i class="fa-solid fa-hourglass-half"></i> Pending</span>'}
+                ${dlBadge}
+              </div>
+            </div>`;
+          }).join('')}
+
+          <div class="divider"></div>
+          <div class="section-title"><h3><i class="fa-solid fa-people-group"></i> Team Fund Status (All Players)</h3></div>
+          ${teamStatusTableHTML(p.id)}
+        </div>
+
+        <div class="card fadeUp">
+          <div class="section-title">
+            <h3><i class="fa-solid fa-comments"></i> Message Captain</h3>
+            ${msgs.length>0 ? `<button class="btn btn-ghost btn-sm" onclick="playerClearChat('${p.id}')"><i class="fa-solid fa-trash"></i> Clear Chat</button>` : ''}
+          </div>
+          <div class="chat-shell" style="grid-template-columns:1fr; min-height:420px;">
+            <div class="chat-panel">
+              <div class="chat-body" id="playerChatBody">
+                ${msgs.length===0 ? `<div class="empty"><i class="fa-solid fa-comment-dots"></i><h4>No messages</h4><p>Send the Captain a question or request.</p></div>` :
+                msgs.map(m=>`<div class="bubble ${m.sender==='player'?'me':'them'}">${esc(m.text)}<span class="bt">${m.sender==='player'?'You':'Captain'} · ${timeAgo(m.ts)}</span></div>`).join('')}
+              </div>
+              <form class="chat-input" id="playerMsgForm">
+                <input type="text" id="playerMsgText" placeholder="Type your message…" required>
+                <button type="submit" class="btn btn-primary btn-icon"><i class="fa-solid fa-paper-plane"></i></button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>`;
+
+  const body = document.getElementById('playerChatBody');
+  if(body) body.scrollTop = body.scrollHeight;
+  animateCounters(document);
+
+  if(toMark.length) markReadRemote(toMark, 'readByPlayer');
+
+  document.getElementById('playerMsgForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const input = document.getElementById('playerMsgText');
+    const text = input.value.trim();
+    if(!text) return;
+    input.value=''; input.disabled = true;
+    try{
+      await addMessageRemote({ playerId:p.id, sender:'player', text, ts:Date.now(), readByAdmin:false, readByPlayer:true });
+    }catch(err){ toast('Message failed to send: '+err.message,'err'); }
+    renderPlayerDashboard();
+  });
+
+  startChatPoll(async ()=>{
+    try{ await refetchMessages(); }catch(e){ return; }
+    if(session.role==='player' && session.playerId===p.id){
+      const bodyEl = document.getElementById('playerChatBody');
+      if(!bodyEl) return;
+      const active = document.activeElement;
+      const typing = active && active.id==='playerMsgText' && active.value.length>0;
+      if(!typing) renderPlayerDashboard();
+    }
+  });
+}
+
+async function playerClearChat(playerId){
+  openModal('Clear Chat', `
+    <p style="color:var(--text-dim); margin-bottom:20px;">This will permanently delete your entire conversation with the Captain. This cannot be undone.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger btn-block" id="confirmClearChatBtn"><i class="fa-solid fa-trash"></i> Clear Chat</button>
+    </div>
+  `);
+  document.getElementById('confirmClearChatBtn').addEventListener('click', async ()=>{
+    busy(true);
+    try{ await clearChatRemote(playerId); toast('Chat cleared'); }
+    catch(e){ toast('Failed: '+e.message,'err'); }
+    busy(false); closeModal(); render();
+  });
+}
+
+/* =========================================================
+   ADMIN DASHBOARD
+========================================================= */
+function setAdminTab(tab){ adminTab = tab; renderAdminDashboard(); }
+
+async function renderAdminDashboard(){
+  const unread = unreadForAdmin();
+  document.getElementById('app').innerHTML = `
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="sb-brand"><div class="sb-ball"></div><div><strong>Rising Stars</strong><small>Captain Panel</small></div></div>
+      <button class="nav-item ${adminTab==='overview'?'active':''}" onclick="setAdminTab('overview')"><i class="fa-solid fa-gauge"></i> <span>Overview</span></button>
+      <button class="nav-item ${adminTab==='players'?'active':''}" onclick="setAdminTab('players')"><i class="fa-solid fa-users"></i> <span>Players</span><span class="nav-badge">${db.players.length}</span></button>
+      <button class="nav-item ${adminTab==='funds'?'active':''}" onclick="setAdminTab('funds')"><i class="fa-solid fa-sack-dollar"></i> <span>Funds</span><span class="nav-badge">${db.funds.length}</span></button>
+      <button class="nav-item ${adminTab==='messages'?'active':''}" onclick="setAdminTab('messages')"><i class="fa-solid fa-comments"></i> <span>Messages</span>${unread?`<span class="nav-badge">${unread}</span>`:''}</button>
+      <div class="sb-foot">
+        <button class="btn btn-ghost btn-block" onclick="logout()"><i class="fa-solid fa-right-from-bracket"></i> <span>Logout</span></button>
+      </div>
+    </aside>
+    <main class="main" id="adminMain"></main>
+  </div>`;
+  const main = document.getElementById('adminMain');
+  if(adminTab==='overview'){ stopChatPoll(); main.innerHTML = adminOverviewHTML(); }
+  else if(adminTab==='players'){ stopChatPoll(); main.innerHTML = adminPlayersHTML(); }
+  else if(adminTab==='funds'){ stopChatPoll(); main.innerHTML = adminFundsHTML(); }
+  else if(adminTab==='messages'){ renderAdminMessages(main); }
+  else { stopChatPoll(); }
+  animateCounters(main);
+}
+
+/* ---- OVERVIEW ---- */
+function adminOverviewHTML(){
+  const recentMsgs = [...db.messages].sort((a,b)=>b.ts-a.ts).slice(0,5);
+  return `
+    <div class="topbar fadeUp"><div><h2>Team Overview</h2><p>The complete picture of your club's fund status.</p></div></div>
+    ${globalStatCardsHTML()}
+    <div class="grid2" style="grid-template-columns:1.3fr .7fr; align-items:start; margin-top:8px;">
+      <div class="card fadeUp">
+        <div class="section-title"><h3><i class="fa-solid fa-chart-simple"></i> Fund Progress</h3></div>
+        ${db.funds.length===0 ? `<div class="empty"><i class="fa-solid fa-sack-dollar"></i><h4>No funds created yet</h4><p>Go to the Funds tab to create your first fund item.</p></div>` :
+        db.funds.map(f=>{
+          const s = fundStats(f);
+          return `<div style="display:flex; align-items:center; gap:16px; margin-bottom:18px;">
+            <div class="ring-wrap"><div class="ring" style="--pct:${s.pct}; background:conic-gradient(var(--emerald) calc(var(--pct)*1%), rgba(255,255,255,.08) 0);"></div><div class="ring-inner">${s.pct}%</div></div>
+            <div style="flex:1; min-width:0;">
+              <div style="display:flex; justify-content:space-between; font-size:.85rem; margin-bottom:6px; gap:8px;"><b>${esc(f.item)}</b><span style="color:var(--text-dim); white-space:nowrap;">${s.complete}/${s.total} paid</span></div>
+              <div class="progress-bar"><div class="progress-fill" style="width:${s.pct}%"></div></div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="card fadeUp">
+        <div class="section-title"><h3><i class="fa-solid fa-comment-dots"></i> Recent Messages</h3></div>
+        ${recentMsgs.length===0 ? `<div class="empty" style="padding:24px 10px;"><i class="fa-solid fa-comment-slash"></i><h4>No messages</h4></div>` :
+        recentMsgs.map(m=>{
+          const pl = db.players.find(p=>p.id===m.playerId);
+          return `<div style="padding:10px 0; border-bottom:1px dashed var(--brd); cursor:pointer;" onclick="setAdminTab('messages'); setTimeout(()=>openChatWith('${m.playerId}'),0)">
+            <div style="display:flex; justify-content:space-between; gap:8px;"><b style="font-size:.85rem;">${esc(pl?pl.name:'Unknown')}</b><span style="font-size:.7rem; color:var(--text-dim); white-space:nowrap;">${timeAgo(m.ts)}</span></div>
+            <div style="font-size:.78rem; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${m.sender==='admin'?'You: ':''}${esc(m.text)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="card fadeUp">
+      <div class="section-title"><h3><i class="fa-solid fa-people-group"></i> Team Fund Status (All Players)</h3></div>
+      ${teamStatusTableHTML(null)}
+    </div>`;
+}
+
+/* ---- PLAYERS TAB ---- */
+function adminPlayersHTML(){
+  if(db.players.length===0){
+    return `<div class="topbar fadeUp"><div><h2>Players</h2><p>Registered team members.</p></div></div>
+    <div class="card"><div class="empty"><i class="fa-solid fa-user-group"></i><h4>No players registered yet</h4><p>Players will appear here once they register.</p></div></div>`;
+  }
+  return `
+  <div class="topbar fadeUp"><div><h2>Players</h2><p>${db.players.length} registered team members.</p></div></div>
+  <div class="grid2 stagger">
+    ${db.players.map(p=>{
+      const agg = playerAggregate(p.id);
+      return `
+      <div class="player-card fadeUp">
+        <div class="p-head">
+          <div class="avatar">${initials(p.name)}</div>
+          <div>
+            <div class="name">${esc(p.name)}</div>
+            <div class="role-tag">${esc(p.role)}</div>
+          </div>
+        </div>
+        <div class="p-meta">
+          <span class="chip"><i class="fa-solid fa-mobile-screen"></i> ${esc(p.mobile)}</span>
+          <span class="chip"><i class="fa-solid fa-cake-candles"></i> ${esc(p.age)}</span>
+          <span class="chip"><i class="fa-solid fa-venus-mars"></i> ${esc(p.gender)}</span>
+        </div>
+        <div class="p-meta">
+          <span class="badge badge-pending"><i class="fa-solid fa-hourglass-half"></i> ${agg.pendingCount} pending</span>
+          <span class="badge badge-complete"><i class="fa-solid fa-check"></i> ${agg.completeCount} complete</span>
+        </div>
+        <div class="p-fund-line"><span>Total Assigned</span><b>${fmtMoney(agg.totalAssigned)}</b></div>
+        <div class="p-fund-line"><span>Total Paid</span><b style="color:var(--emerald);">${fmtMoney(agg.totalPaid)}</b></div>
+        <div class="p-fund-line"><span>Remaining</span><b style="color:var(--amber);">${fmtMoney(agg.totalRemaining)}</b></div>
+        <div class="p-actions">
+          <button class="btn btn-ghost btn-sm" onclick="editPlayerModal('${p.id}')"><i class="fa-solid fa-pen"></i> Edit Name</button>
+          <button class="btn btn-ghost btn-sm" onclick="setAdminTab('messages'); setTimeout(()=>openChatWith('${p.id}'),0)"><i class="fa-solid fa-comment"></i> Message</button>
+          ${agg.hasAny ? `<button class="btn btn-ghost btn-sm" onclick="clearPlayerHistoryModal('${p.id}')"><i class="fa-solid fa-clock-rotate-left"></i> Clear Fund History</button>` : ''}
+          <button class="btn btn-danger btn-sm" onclick="deletePlayer('${p.id}')"><i class="fa-solid fa-trash"></i></button>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function editPlayerModal(id){
+  const p = db.players.find(x=>x.id===id);
+  if(!p) return;
+  openModal('Edit Player Name', `
+    <div class="field"><label>Full Name</label><input type="text" id="editPName" value="${esc(p.name)}"></div>
+    <button class="btn btn-primary btn-block" onclick="savePlayerName('${id}')"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+  `);
+}
+async function savePlayerName(id){
+  const val = document.getElementById('editPName').value.trim();
+  if(!val){ toast('Name cannot be empty','err'); return; }
+  busy(true);
+  try{ await updatePlayerNameRemote(id, val); toast('Player name updated'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); closeModal(); renderAdminDashboard();
+}
+function deletePlayer(id){
+  const p = db.players.find(x=>x.id===id);
+  if(!p) return;
+  openModal('Delete Player', `
+    <p style="color:var(--text-dim); margin-bottom:20px;">Are you sure you want to permanently remove <b style="color:var(--text);">${esc(p.name)}</b>? Their fund records and chat history will also be deleted, and their mobile number will be free to register again.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger btn-block" onclick="confirmDeletePlayer('${id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+    </div>
+  `);
+}
+async function confirmDeletePlayer(id){
+  busy(true);
+  try{ await deletePlayerRemote(id); toast('Player deleted'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); closeModal(); renderAdminDashboard();
+}
+function clearPlayerHistoryModal(id){
+  const p = db.players.find(x=>x.id===id);
+  if(!p) return;
+  openModal('Clear Fund History', `
+    <p style="color:var(--text-dim); margin-bottom:20px;">This removes <b style="color:var(--text);">${esc(p.name)}</b> from every fund they are currently assigned to (all pending &amp; paid records). The player stays registered. This also updates their dashboard immediately. This cannot be undone.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger btn-block" id="confirmClearHistBtn"><i class="fa-solid fa-clock-rotate-left"></i> Clear History</button>
+    </div>
+  `);
+  document.getElementById('confirmClearHistBtn').addEventListener('click', async ()=>{
+    busy(true);
+    try{ await clearPlayerFundHistoryRemote(id); toast('Fund history cleared for '+p.name); }
+    catch(e){ toast('Failed: '+e.message,'err'); }
+    busy(false); closeModal(); renderAdminDashboard();
+  });
+}
+
+/* ---- FUNDS TAB ---- */
+function adminFundsHTML(){
+  return `
+  <div class="topbar fadeUp">
+    <div><h2>Funds</h2><p>Manage team fund items, pricing and deadlines.</p></div>
+    <button class="btn btn-primary" onclick="createFundModal()"><i class="fa-solid fa-plus"></i> New Fund Item</button>
+  </div>
+  ${db.funds.length===0 ? `<div class="card"><div class="empty"><i class="fa-solid fa-sack-dollar"></i><h4>No funds yet</h4><p>Click "New Fund Item" to create your first fund.</p></div></div>` :
+  db.funds.map(f=>{
+    const s = fundStats(f);
+    const dl = daysLeft(f.deadline);
+    return `
+    <div class="fund-card fadeUp">
+      <div class="fund-top">
+        <div class="fund-top-left">
+          <div class="ring-wrap"><div class="ring" style="--pct:${s.pct}; background:conic-gradient(var(--emerald) calc(var(--pct)*1%), rgba(255,255,255,.08) 0);"></div><div class="ring-inner">${s.pct}%</div></div>
+          <div style="min-width:0;">
+            <h4>${esc(f.item)}</h4>
+            <div style="font-size:.76rem; color:var(--text-dim); margin-top:2px;">Per player: ${fmtMoney(f.price)}</div>
+          </div>
+        </div>
+        <span class="fund-price">${fmtMoney(s.totalValue)} <span style="font-size:.68rem; color:var(--text-dim); font-weight:400;">total</span></span>
+      </div>
+      <div class="fund-meta">
+        <span><i class="fa-solid fa-calendar-day"></i> Start: <b>${fmtDate(f.startDate)}</b></span>
+        <span><i class="fa-solid fa-flag-checkered"></i> Deadline: <b>${fmtDate(f.deadline)}</b></span>
+        ${dl!==null ? (dl<0? `<span class="badge badge-overdue">Overdue</span>` : `<span class="badge badge-pending">${dl}d left</span>`) : ''}
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${s.pct}%"></div></div>
+      <div class="progress-txt"><span>${fmtMoney(s.collected)} collected</span><span>${fmtMoney(s.remaining)} remaining</span></div>
+      <div class="assign-list">
+        ${f.assigned.length===0? `<div style="font-size:.8rem; color:var(--text-dim);">No players assigned</div>` :
+        f.assigned.map(a=>{
+          const pl = db.players.find(p=>p.id===a.playerId);
+          if(!pl) return '';
+          return `<div class="assign-row">
+            <div><span class="an">${esc(pl.name)}</span><br><span class="am">${esc(pl.mobile)}${a.status==='complete'&&a.paidDate? ' · Paid '+fmtDate(a.paidDate):''}</span></div>
+            <div class="toggle-status">
+              <button class="${a.status==='pending'?'on pend':''}" onclick="setFundStatus('${f.id}','${a.playerId}','pending')">Pending</button>
+              <button class="${a.status==='complete'?'on comp':''}" onclick="setFundStatus('${f.id}','${a.playerId}','complete')">Complete</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="fund-actions">
+        <button class="btn btn-ghost btn-sm" onclick="editFundModal('${f.id}')"><i class="fa-solid fa-pen"></i> Edit Details</button>
+        <button class="btn btn-ghost btn-sm" onclick="manageAssignedModal('${f.id}')"><i class="fa-solid fa-user-plus"></i> Manage Players</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFund('${f.id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+      </div>
+    </div>`;
+  }).join('')}`;
+}
+
+function playerCheckboxes(selectedIds){
+  if(db.players.length===0) return `<p style="font-size:.82rem; color:var(--text-dim);">No players registered yet.</p>`;
+  return `<div style="display:flex; flex-direction:column; gap:8px; max-height:200px; overflow-y:auto; margin-top:6px;">
+    ${db.players.map(p=>`
+      <label style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.04); padding:9px 12px; border-radius:11px; cursor:pointer;">
+        <input type="checkbox" value="${p.id}" ${selectedIds.includes(p.id)?'checked':''} style="width:16px;height:16px;">
+        <span style="font-size:.85rem;">${esc(p.name)} <span style="color:var(--text-dim); font-size:.72rem;">(${esc(p.role)})</span></span>
+      </label>`).join('')}
+  </div>`;
+}
+
+function createFundModal(){
+  openModal('Create Fund Item', `
+    <div class="field"><label>Item Name</label><input type="text" id="fItem" placeholder="e.g. Team Kit, Ground Fee"></div>
+    <div class="row2">
+      <div class="field"><label>Price / Player</label><input type="number" id="fPrice" placeholder="Rs" min="0"></div>
+      <div class="field"><label>Start Date</label><input type="date" id="fStart"></div>
+    </div>
+    <div class="field"><label>Deadline</label><input type="date" id="fDeadline"></div>
+    <div class="field"><label>Assign To Players</label>${playerCheckboxes([])}</div>
+    <button class="btn btn-primary btn-block" onclick="saveFund()"><i class="fa-solid fa-floppy-disk"></i> Create Fund</button>
+  `);
+}
+
+async function saveFund(){
+  const item = document.getElementById('fItem').value.trim();
+  const price = Number(document.getElementById('fPrice').value);
+  const start = document.getElementById('fStart').value;
+  const deadline = document.getElementById('fDeadline').value;
+  const checked = [...document.querySelectorAll('#modalOverlay input[type=checkbox]:checked')].map(c=>c.value);
+  if(!item || !price || !start || !deadline){ toast('Please fill in all fields','err'); return; }
+  const fund = { item, price, startDate:start, deadline, createdAt:Date.now(), assigned: checked.map(id=>({playerId:id, status:'pending', paidDate:null})) };
+  busy(true);
+  try{ await createFundRemote(fund); toast('Fund created: '+item); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); closeModal(); renderAdminDashboard();
+}
+
+function editFundModal(id){
+  const f = db.funds.find(x=>x.id===id);
+  if(!f) return;
+  openModal('Edit Fund Item', `
+    <div class="field"><label>Item Name</label><input type="text" id="fItem" value="${esc(f.item)}"></div>
+    <div class="row2">
+      <div class="field"><label>Price / Player</label><input type="number" id="fPrice" value="${f.price}"></div>
+      <div class="field"><label>Start Date</label><input type="date" id="fStart" value="${f.startDate}"></div>
+    </div>
+    <div class="field"><label>Deadline</label><input type="date" id="fDeadline" value="${f.deadline}"></div>
+    <button class="btn btn-primary btn-block" onclick="updateFund('${id}')"><i class="fa-solid fa-floppy-disk"></i> Save Changes</button>
+  `);
+}
+async function updateFund(id){
+  const item = document.getElementById('fItem').value.trim();
+  const price = Number(document.getElementById('fPrice').value);
+  const start = document.getElementById('fStart').value;
+  const deadline = document.getElementById('fDeadline').value;
+  if(!item || !price || !start || !deadline){ toast('Please fill in all fields','err'); return; }
+  busy(true);
+  try{ await updateFundRemote(id, { item, price, startDate:start, deadline }); toast('Fund updated'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); closeModal(); renderAdminDashboard();
+}
+
+function manageAssignedModal(id){
+  const f = db.funds.find(x=>x.id===id);
+  if(!f) return;
+  const selected = f.assigned.map(a=>a.playerId);
+  openModal('Manage Assigned Players', `
+    ${playerCheckboxes(selected)}
+    <button class="btn btn-primary btn-block" style="margin-top:16px;" onclick="updateAssigned('${id}')"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+  `);
+}
+async function updateAssigned(id){
+  const f = db.funds.find(x=>x.id===id);
+  const checked = [...document.querySelectorAll('#modalOverlay input[type=checkbox]:checked')].map(c=>c.value);
+  const existing = {}; f.assigned.forEach(a=> existing[a.playerId]={status:a.status, paidDate:a.paidDate});
+  const newAssigned = checked.map(pid=>({ playerId:pid, status: (existing[pid]&&existing[pid].status) || 'pending', paidDate: (existing[pid]&&existing[pid].paidDate) || null }));
+  busy(true);
+  try{ await updateFundRemote(id, { assigned:newAssigned }); toast('Assigned players updated'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); closeModal(); renderAdminDashboard();
+}
+
+async function setFundStatus(fundId, playerId, status){
+  const f = db.funds.find(x=>x.id===fundId);
+  const newAssigned = f.assigned.map(a=> a.playerId===playerId ? { ...a, status, paidDate: status==='complete' ? todayISO() : null } : a);
+  busy(true);
+  try{ await updateFundRemote(fundId, { assigned:newAssigned }); toast('Status set to '+status); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); renderAdminDashboard();
+}
+
+function deleteFund(id){
+  const f = db.funds.find(x=>x.id===id);
+  if(!f) return;
+  openModal('Delete Fund', `
+    <p style="color:var(--text-dim); margin-bottom:20px;">Are you sure you want to delete the <b style="color:var(--text);">${esc(f.item)}</b> fund? This is permanent and will remove it from every player's dashboard.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger btn-block" onclick="confirmDeleteFund('${id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+    </div>
+  `);
+}
+async function confirmDeleteFund(id){
+  busy(true);
+  try{ await deleteFundRemote(id); toast('Fund deleted'); }
+  catch(e){ toast('Failed: '+e.message,'err'); }
+  busy(false); closeModal(); renderAdminDashboard();
+}
+
+/* ---- MESSAGES TAB ---- */
+function openChatWith(playerId){ activeChatPlayerId = playerId; renderAdminDashboard(); }
+
+function renderAdminMessages(main){
+  if(db.players.length===0){
+    stopChatPoll();
+    main.innerHTML = `<div class="topbar fadeUp"><div><h2>Messages</h2><p>Chat with your players.</p></div></div>
+    <div class="card"><div class="empty"><i class="fa-solid fa-comment-slash"></i><h4>No players yet</h4></div></div>`;
+    return;
+  }
+  if(!activeChatPlayerId || !db.players.find(p=>p.id===activeChatPlayerId)) activeChatPlayerId = db.players[0].id;
+
+  main.innerHTML = `
+  <div class="topbar fadeUp"><div><h2>Messages</h2><p>Chat with players and reply to their questions.</p></div></div>
+  <div class="chat-shell fadeUp">
+    <div class="chat-list" id="adminChatList"></div>
+    <div class="chat-panel">
+      <div class="chat-head" id="adminChatHead"></div>
+      <div class="chat-body" id="adminChatBody"></div>
+      <form class="chat-input" id="adminMsgForm">
+        <input type="text" id="adminMsgText" placeholder="Type a reply…" required>
+        <button type="submit" class="btn btn-primary btn-icon"><i class="fa-solid fa-paper-plane"></i></button>
+      </form>
+    </div>
+  </div>`;
+
+  const list = document.getElementById('adminChatList');
+  list.innerHTML = db.players.map(p=>{
+    const pMsgs = db.messages.filter(m=>m.playerId===p.id).sort((a,b)=>a.ts-b.ts);
+    const last = pMsgs[pMsgs.length-1];
+    const unread = pMsgs.filter(m=>m.sender==='player' && !m.readByAdmin).length;
+    return `<div class="chat-list-item ${p.id===activeChatPlayerId?'active':''}" onclick="openChatWith('${p.id}')">
+      <div class="avatar" style="width:36px;height:36px;font-size:.78rem;">${initials(p.name)}</div>
+      <div style="flex:1; min-width:0;">
+        <div class="ci-name">${esc(p.name)}</div>
+        <div class="ci-prev">${last ? esc(last.text) : 'No messages'}</div>
+      </div>
+      ${unread? `<span class="nav-badge">${unread}</span>`:''}
+    </div>`;
+  }).join('');
+
+  const p = db.players.find(x=>x.id===activeChatPlayerId);
+  const pMsgs = db.messages.filter(m=>m.playerId===p.id).sort((a,b)=>a.ts-b.ts);
+  document.getElementById('adminChatHead').innerHTML = `
+    <div class="avatar" style="width:38px;height:38px;font-size:.85rem;">${initials(p.name)}</div>
+    <div style="flex:1;"><div style="font-weight:700; font-size:.92rem;">${esc(p.name)}</div><div style="font-size:.72rem; color:var(--text-dim);">${esc(p.role)} · ${esc(p.mobile)}</div></div>
+    ${pMsgs.length>0 ? `<button class="btn btn-ghost btn-sm" onclick="adminClearChat('${p.id}')"><i class="fa-solid fa-trash"></i> Clear Chat</button>` : ''}
+  `;
+
+  const toMark = pMsgs.filter(m=>m.sender==='player' && !m.readByAdmin).map(m=>m.id);
+  if(toMark.length) markReadRemote(toMark, 'readByAdmin');
+
+  const body = document.getElementById('adminChatBody');
+  body.innerHTML = pMsgs.length===0 ? `<div class="empty"><i class="fa-solid fa-comment-dots"></i><h4>No messages</h4></div>` :
+    pMsgs.map(m=>`<div class="bubble ${m.sender==='admin'?'me':'them'}">${esc(m.text)}<span class="bt">${m.sender==='admin'?'You':esc(p.name)} · ${timeAgo(m.ts)}</span></div>`).join('');
+  body.scrollTop = body.scrollHeight;
+
+  document.getElementById('adminMsgForm').addEventListener('submit', async e=>{
+    e.preventDefault();
+    const input = document.getElementById('adminMsgText');
+    const text = input.value.trim();
+    if(!text) return;
+    input.value=''; input.disabled = true;
+    try{
+      await addMessageRemote({ playerId:p.id, sender:'admin', text, ts:Date.now(), readByAdmin:true, readByPlayer:false });
+    }catch(err){ toast('Message failed to send: '+err.message,'err'); }
+    renderAdminDashboard();
+  });
+
+  startChatPoll(async ()=>{
+    try{ await refetchMessages(); }catch(e){ return; }
+    if(session.role==='admin' && adminTab==='messages'){
+      const active = document.activeElement;
+      const typing = active && active.id==='adminMsgText' && active.value.length>0;
+      if(!typing) renderAdminDashboard();
+    }
+  });
+}
+
+function adminClearChat(playerId){
+  const p = db.players.find(x=>x.id===playerId);
+  openModal('Clear Chat', `
+    <p style="color:var(--text-dim); margin-bottom:20px;">Permanently delete the entire conversation with <b style="color:var(--text);">${esc(p?p.name:'this player')}</b>? This cannot be undone.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn btn-ghost btn-block" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-danger btn-block" id="confirmAdminClearChatBtn"><i class="fa-solid fa-trash"></i> Clear Chat</button>
+    </div>
+  `);
+  document.getElementById('confirmAdminClearChatBtn').addEventListener('click', async ()=>{
+    busy(true);
+    try{ await clearChatRemote(playerId); toast('Chat cleared'); }
+    catch(e){ toast('Failed: '+e.message,'err'); }
+    busy(false); closeModal(); renderAdminDashboard();
+  });
+}
+
+/* =========================================================
+   BOOT
+========================================================= */
+function renderConfigNeeded(){
+  document.getElementById('app').innerHTML = `
+  <div class="boot-wrap">
+    <div class="cfg-card fadeUp">
+      <h2><i class="fa-solid fa-database" style="color:var(--emerald);"></i> Database not configured yet</h2>
+      <p>This app now stores all players, funds and chat messages in a free <b>Firebase Firestore</b> cloud database so the data is permanent and shared across every mobile/device that opens this site.</p>
+      <p>Open the file, find <code>FIREBASE_CONFIG</code> near the top of the <code>&lt;script&gt;</code> section, and paste in your own Firebase project's config values.</p>
+      <ol>
+        <li>Go to <code>console.firebase.google.com</code> and create a free project.</li>
+        <li>Build → Firestore Database → Create database (Start in test mode).</li>
+        <li>Project settings → Your apps → Web app (&lt;/&gt;) → copy the config object.</li>
+        <li>Paste the values into <code>FIREBASE_CONFIG</code> in this file and re-upload/host it.</li>
+      </ol>
+    </div>
+  </div>`;
+}
+function renderBootError(msg){
+  document.getElementById('app').innerHTML = `
+  <div class="boot-wrap">
+    <div class="cfg-card fadeUp">
+      <h2><i class="fa-solid fa-triangle-exclamation" style="color:var(--rose);"></i> Could not connect to the database</h2>
+      <p>${esc(msg)}</p>
+      <p>Double check your <code>FIREBASE_CONFIG</code> values and your Firestore security rules, then reload the page.</p>
+    </div>
+  </div>`;
+}
+function renderBootLoading(){
+  document.getElementById('app').innerHTML = `
+  <div class="boot-wrap">
+    <div>
+      <div class="boot-spin"></div>
+      <p style="color:var(--text-dim); font-size:.9rem;">Connecting to the database…</p>
+    </div>
+  </div>`;
+}
+
+async function boot(){
+  renderBootLoading();
+  if(!isConfigured()){ renderConfigNeeded(); return; }
+  try{
+    await initFirebase();
+  }catch(e){
+    renderBootError(e.message || String(e));
+    return;
+  }
+  render();
+}
+boot();
+</script>
+</body>
+</html>
